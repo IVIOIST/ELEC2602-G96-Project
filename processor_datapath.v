@@ -10,48 +10,79 @@ module processor_datapath (
     input  wire        rxout,
     input  wire        ryout,
     input  wire        gout,
+    input  wire        memout,
 
     input  wire        ain,
     input  wire        gin,
     input  wire        rxin,
+    input  wire        memwrite,
 
-    input  wire        alu_sub, 
+    input  wire [2:0]  alu_op,
 
+    output wire        equal,
     output wire [15:0] r0_out,
     output wire [15:0] r1_out,
     output wire [15:0] r2_out,
+    output wire [15:0] r3_out,
     output wire [15:0] bus_out
 );
+
+    localparam DATA_ADDR_WIDTH = 8;
+    localparam DATA_DEPTH      = 256;
+
+    localparam ALU_ADD = 3'd0;
+    localparam ALU_SUB = 3'd1;
+    localparam ALU_MUL = 3'd2;
+    localparam ALU_INC = 3'd3;
+    localparam ALU_DEC = 3'd4;
 
     reg [15:0] R0;
     reg [15:0] R1;
     reg [15:0] R2;
+    reg [15:0] R3;
 
     reg [15:0] A;
     reg [15:0] G;
 
     reg [15:0] bus;
+    reg [15:0] data_memory [0:DATA_DEPTH-1];
 
     wire [15:0] rx_value;
     wire [15:0] ry_value;
+    wire [15:0] mem_value;
     wire [15:0] alu_result;
+
+    integer i;
 
     assign r0_out  = R0;
     assign r1_out  = R1;
     assign r2_out  = R2;
+    assign r3_out  = R3;
     assign bus_out = bus;
+    assign equal   = (rx_value == ry_value);
 
     assign rx_value = (rx == 2'b00) ? R0 :
                       (rx == 2'b01) ? R1 :
                       (rx == 2'b10) ? R2 :
-                                      16'd0;
+                                      R3;
 
     assign ry_value = (ry == 2'b00) ? R0 :
                       (ry == 2'b01) ? R1 :
                       (ry == 2'b10) ? R2 :
-                                      16'd0;
+                                      R3;
 
-    assign alu_result = alu_sub ? (A - bus) : (A + bus); //(alu_sub = 0 -> alu_result = A + bus), (alu_sub = 1 -> alu_result = A - bus)
+    assign mem_value = data_memory[imm[DATA_ADDR_WIDTH-1:0]];
+
+    assign alu_result = (alu_op == ALU_SUB) ? (A - bus) :
+                        (alu_op == ALU_MUL) ? (A * bus) :
+                        (alu_op == ALU_INC) ? (A + 16'd1) :
+                        (alu_op == ALU_DEC) ? (A - 16'd1) :
+                                              (A + bus);
+
+    initial begin
+        for (i = 0; i < DATA_DEPTH; i = i + 1)
+            data_memory[i] = 16'd0;
+    end
 
     always @(*) begin
         if (immout)
@@ -62,6 +93,8 @@ module processor_datapath (
             bus = ry_value;
         else if (gout)
             bus = G;
+        else if (memout)
+            bus = mem_value;
         else
             bus = 16'd0;
     end
@@ -71,6 +104,7 @@ module processor_datapath (
             R0 <= 16'd0;
             R1 <= 16'd0;
             R2 <= 16'd0;
+            R3 <= 16'd0;
             A  <= 16'd0;
             G  <= 16'd0;
         end else begin
@@ -85,9 +119,13 @@ module processor_datapath (
                     2'b00: R0 <= bus;
                     2'b01: R1 <= bus;
                     2'b10: R2 <= bus;
+                    2'b11: R3 <= bus;
                     default: ;
                 endcase
             end
+
+            if (memwrite)
+                data_memory[imm[DATA_ADDR_WIDTH-1:0]] <= bus;
         end
     end
 
