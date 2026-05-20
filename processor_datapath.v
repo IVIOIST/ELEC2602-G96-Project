@@ -19,71 +19,86 @@ module processor_datapath (
 
     input  wire [2:0]  alu_op,
 
-    output wire        equal,
     output wire [15:0] r0_out,
     output wire [15:0] r1_out,
     output wire [15:0] r2_out,
-    output wire [15:0] r3_out,
-    output wire [15:0] bus_out
+    output wire [15:0] bus_out,
+    output wire [15:0] mem_debug_out,
+	 output wire        rx_zero
 );
 
-    localparam DATA_ADDR_WIDTH = 8;
-    localparam DATA_DEPTH      = 256;
+    // ALU operation codes
+    localparam ALU_ADD = 3'b000;
+    localparam ALU_SUB = 3'b001;
+    localparam ALU_MUL = 3'b010;
+    localparam ALU_INC = 3'b011;
+    localparam ALU_DEC = 3'b100;
 
-    localparam ALU_ADD = 3'd0;
-    localparam ALU_SUB = 3'd1;
-    localparam ALU_MUL = 3'd2;
-    localparam ALU_INC = 3'd3;
-    localparam ALU_DEC = 3'd4;
-
+    // General purpose registers
     reg [15:0] R0;
     reg [15:0] R1;
     reg [15:0] R2;
-    reg [15:0] R3;
 
+    // Internal registers
     reg [15:0] A;
     reg [15:0] G;
 
-    reg [15:0] bus;
-    reg [15:0] data_memory [0:DATA_DEPTH-1];
+    // Data memory: 256 x 16-bit
+    reg [15:0] data_mem [0:255];
 
+    // Bus
+    reg [15:0] bus;
+
+    // Selected register values
     wire [15:0] rx_value;
     wire [15:0] ry_value;
-    wire [15:0] mem_value;
-    wire [15:0] alu_result;
 
-    integer i;
+    // Memory address uses lower 8 bits of imm
+    wire [7:0] mem_addr;
+    wire [15:0] mem_read_data;
+
+    // ALU result
+    reg [15:0] alu_result;
 
     assign r0_out  = R0;
     assign r1_out  = R1;
     assign r2_out  = R2;
-    assign r3_out  = R3;
     assign bus_out = bus;
-    assign equal   = (rx_value == ry_value);
 
+    assign mem_addr = imm[7:0];
+    assign mem_read_data = data_mem[mem_addr];
+
+    // For simulation/debug: show data_mem[10]
+    assign mem_debug_out = data_mem[8'd10];
+
+    // Select Rx register value
     assign rx_value = (rx == 2'b00) ? R0 :
                       (rx == 2'b01) ? R1 :
                       (rx == 2'b10) ? R2 :
-                                      R3;
+                                      16'd0;
 
+    // Select Ry register value
     assign ry_value = (ry == 2'b00) ? R0 :
                       (ry == 2'b01) ? R1 :
                       (ry == 2'b10) ? R2 :
-                                      R3;
+                                      16'd0;
+	 
+	 // rx_zero value
+	 assign rx_zero = (rx_value == 16'd0);
 
-    assign mem_value = data_memory[imm[DATA_ADDR_WIDTH-1:0]];
-
-    assign alu_result = (alu_op == ALU_SUB) ? (A - bus) :
-                        (alu_op == ALU_MUL) ? (A * bus) :
-                        (alu_op == ALU_INC) ? (A + 16'd1) :
-                        (alu_op == ALU_DEC) ? (A - 16'd1) :
-                                              (A + bus);
-
-    initial begin
-        for (i = 0; i < DATA_DEPTH; i = i + 1)
-            data_memory[i] = 16'd0;
+    // ALU
+    always @(*) begin
+        case (alu_op)
+            ALU_ADD: alu_result = A + bus;
+            ALU_SUB: alu_result = A - bus;
+            ALU_MUL: alu_result = A * bus;
+            ALU_INC: alu_result = A + 16'd1;
+            ALU_DEC: alu_result = A - 16'd1;
+            default: alu_result = 16'd0;
+        endcase
     end
 
+    // Bus multiplexer
     always @(*) begin
         if (immout)
             bus = imm;
@@ -94,39 +109,37 @@ module processor_datapath (
         else if (gout)
             bus = G;
         else if (memout)
-            bus = mem_value;
+            bus = mem_read_data;
         else
             bus = 16'd0;
     end
 
-    always @(posedge clk) begin
-        if (reset) begin
-            R0 <= 16'd0;
-            R1 <= 16'd0;
-            R2 <= 16'd0;
-            R3 <= 16'd0;
-            A  <= 16'd0;
-            G  <= 16'd0;
-        end else begin
-            if (ain)
-                A <= bus;
+    // Registers and data memory write
+		always @(posedge clk or posedge reset) begin
+			 if (reset) begin
+				  R0 <= 16'd0;
+				  R1 <= 16'd0;
+				  R2 <= 16'd0;
+				  A  <= 16'd0;
+				  G  <= 16'd0;
+			 end else begin
+				  if (ain)
+						A <= bus;
 
-            if (gin)
-                G <= alu_result;
+				  if (gin)
+						G <= alu_result;
 
-            if (rxin) begin
-                case (rx)
-                    2'b00: R0 <= bus;
-                    2'b01: R1 <= bus;
-                    2'b10: R2 <= bus;
-                    2'b11: R3 <= bus;
-                    default: ;
-                endcase
-            end
+				  if (rxin) begin
+						case (rx)
+							 2'b00: R0 <= bus;
+							 2'b01: R1 <= bus;
+							 2'b10: R2 <= bus;
+							 default: ;
+						endcase
+				  end
 
-            if (memwrite)
-                data_memory[imm[DATA_ADDR_WIDTH-1:0]] <= bus;
-        end
-    end
-
+				  if (memwrite)
+						data_mem[mem_addr] <= bus;
+			 end
+		end
 endmodule
