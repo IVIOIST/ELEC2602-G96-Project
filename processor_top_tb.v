@@ -40,14 +40,14 @@ module processor_top_tb;
         repeat (60) @(posedge clk);
 
         $display("PC = %d", pc_out);
-        $display("Final R0 = %d", r0_out);
-        $display("Final R1 = %d", r1_out);
-        $display("Final R2 = %d", r2_out);
+        $display("Final R0 = %d (0x%h)", r0_out, r0_out);
+        $display("Final R1 = %d (0x%h)", r1_out, r1_out);
+        $display("Final R2 = %d (0x%h)", r2_out, r2_out);
         $display("data_mem[10] = %d", mem_debug_out);
 
-        if (r0_out == 16'd8 &&
+        if (r0_out == 16'h0406 &&
             r1_out == 16'd3 &&
-            r2_out == 16'd21 &&
+            r2_out == 16'd8 &&
             mem_debug_out == 16'd8) begin
             $display("TEST PASSED");
         end else begin

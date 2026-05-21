@@ -33,6 +33,7 @@ module processor_datapath (
     localparam ALU_MUL = 3'b010;
     localparam ALU_INC = 3'b011;
     localparam ALU_DEC = 3'b100;
+    localparam ALU_PADD = 3'b101;
 
     // General purpose registers
     reg [15:0] R0;
@@ -94,6 +95,7 @@ module processor_datapath (
             ALU_MUL: alu_result = A * bus;
             ALU_INC: alu_result = A + 16'd1;
             ALU_DEC: alu_result = A - 16'd1;
+            ALU_PADD: alu_result = {A[15:8] + bus[15:8], A[7:0] + bus[7:0]};
             default: alu_result = 16'd0;
         endcase
     end

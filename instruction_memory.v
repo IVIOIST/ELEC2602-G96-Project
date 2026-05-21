@@ -15,6 +15,8 @@ module instruction_memory (
     localparam OP_STORE = 4'b1001;
     localparam OP_JMP   = 4'b1010;
     localparam OP_BZ    = 4'b1011;
+    localparam OP_PADD  = 4'b1100;
+    localparam OP_MAC   = 4'b1101;
 
     always @(*) begin
         case (address)
@@ -43,10 +45,14 @@ module instruction_memory (
             // JMP 15         jump over bad instruction
             // LDI R2, 99     skipped
             //
+            // Advanced features:
+            // PADD R0, R1    parallel byte add: 0102 + 0304 = 0406
+            // MAC R2, R1     multiply accumulate: R2 = R2 + R2 * R1 = 8
+            //
             // Final:
-            // R0 = 8
+            // R0 = 0406 hex
             // R1 = 3
-            // R2 = 21
+            // R2 = 8
             // data_mem[10] = 8
             // ------------------------------------------------------------
 
@@ -72,7 +78,15 @@ module instruction_memory (
             8'd13: instruction = {OP_JMP,   2'b00, 2'b00, 16'd15};  // jump to 15
             8'd14: instruction = {OP_LDI,   2'b10, 2'b00, 16'd99};  // skipped
 
-            8'd15: instruction = {OP_NOP,   2'b00, 2'b00, 16'd0};
+            8'd15: instruction = {OP_LDI,   2'b00, 2'b00, 16'h0102}; // R0 = 0102
+            8'd16: instruction = {OP_LDI,   2'b01, 2'b00, 16'h0304}; // R1 = 0304
+            8'd17: instruction = {OP_PADD,  2'b00, 2'b01, 16'd0};    // R0 = 0406
+
+            8'd18: instruction = {OP_LDI,   2'b01, 2'b00, 16'd3};    // R1 = 3
+            8'd19: instruction = {OP_LDI,   2'b10, 2'b00, 16'd2};    // R2 = 2
+            8'd20: instruction = {OP_MAC,   2'b10, 2'b01, 16'd0};    // R2 = 2 + 2 * 3 = 8
+
+            8'd21: instruction = {OP_NOP,   2'b00, 2'b00, 16'd0};
 
             default: instruction = {OP_NOP, 2'b00, 2'b00, 16'd0};
 

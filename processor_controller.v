@@ -35,6 +35,8 @@ module processor_controller (
     localparam OP_STORE = 4'b1001;
     localparam OP_JMP   = 4'b1010;
     localparam OP_BZ    = 4'b1011;
+    localparam OP_PADD  = 4'b1100;
+    localparam OP_MAC   = 4'b1101;
 
     // ALU operation codes
     localparam ALU_ADD = 3'b000;
@@ -42,11 +44,13 @@ module processor_controller (
     localparam ALU_MUL = 3'b010;
     localparam ALU_INC = 3'b011;
     localparam ALU_DEC = 3'b100;
+    localparam ALU_PADD = 3'b101;
 
     // FSM states
     localparam S0 = 2'd0;
     localparam S1 = 2'd1;
     localparam S2 = 2'd2;
+    localparam S3 = 2'd3;
 
     reg [1:0] state;
     reg [1:0] next_state;
@@ -65,7 +69,8 @@ module processor_controller (
 
             S0: begin
                 if (opcode == OP_ADD || opcode == OP_SUB || opcode == OP_MUL ||
-                    opcode == OP_INC || opcode == OP_DEC)
+                    opcode == OP_INC || opcode == OP_DEC || opcode == OP_PADD ||
+                    opcode == OP_MAC)
                     next_state = S1;
                 else
                     next_state = S0;
@@ -76,6 +81,13 @@ module processor_controller (
             end
 
             S2: begin
+                if (opcode == OP_MAC)
+                    next_state = S3;
+                else
+                    next_state = S0;
+            end
+
+            S3: begin
                 next_state = S0;
             end
 
@@ -196,6 +208,40 @@ module processor_controller (
                     gin    = 1'b1;
                     alu_op = ALU_DEC;
                 end else if (state == S2) begin
+                    gout = 1'b1;
+                    rxin = 1'b1;
+                    done = 1'b1;
+                end
+            end
+
+            OP_PADD: begin
+                if (state == S0) begin
+                    rxout = 1'b1;
+                    ain   = 1'b1;
+                end else if (state == S1) begin
+                    ryout  = 1'b1;
+                    gin    = 1'b1;
+                    alu_op = ALU_PADD;
+                end else if (state == S2) begin
+                    gout = 1'b1;
+                    rxin = 1'b1;
+                    done = 1'b1;
+                end
+            end
+
+            OP_MAC: begin
+                if (state == S0) begin
+                    rxout = 1'b1;
+                    ain   = 1'b1;
+                end else if (state == S1) begin
+                    ryout  = 1'b1;
+                    gin    = 1'b1;
+                    alu_op = ALU_MUL;
+                end else if (state == S2) begin
+                    gout   = 1'b1;
+                    gin    = 1'b1;
+                    alu_op = ALU_ADD;
+                end else if (state == S3) begin
                     gout = 1'b1;
                     rxin = 1'b1;
                     done = 1'b1;
