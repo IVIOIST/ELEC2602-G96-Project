@@ -4,6 +4,7 @@ module processor_top_tb;
 
     reg clk;
     reg reset;
+    integer cycle_count;
 
     wire [15:0] r0_out;
     wire [15:0] r1_out;
@@ -27,8 +28,32 @@ module processor_top_tb;
     always #5 clk = ~clk;
 
     initial begin
+        cycle_count = 0;
+        $display("Cycle | valid | fetch_pc | execute_pc | execute_instruction | opcode | R0     | R1     | R2");
+        $display("------+-------+----------+------------+---------------------+--------+--------+--------+-------");
+    end
+
+    always @(posedge clk) begin
+        #1;
+        cycle_count = cycle_count + 1;
+        $display("%5d |   %b   |   %3d    |    %3d     |      0x%h      | 0x%h    | 0x%h | 0x%h | 0x%h",
+                 cycle_count,
+                 dut.pipeline_valid,
+                 dut.fetch_pc,
+                 dut.execute_pc,
+                 dut.execute_instruction,
+                 dut.opcode,
+                 r0_out,
+                 r1_out,
+                 r2_out);
+    end
+
+    initial begin
         clk = 1'b0;
         reset = 1'b1;
+
+        $dumpfile("processor_top_tb.vcd");
+        $dumpvars(0, processor_top_tb);
 
         // reset for two clock cycles
         @(posedge clk);
